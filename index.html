@@ -110,6 +110,7 @@
           <option value="all">All status</option>
           <option value="open">Open only</option>
           <option value="done">Checked only</option>
+          <option value="highlighted">NEED vor Dooms Day</option>
         </select>
         <button id="saveChecks" class="btn" type="button">Speichern</button>
         <button id="clearChecks" class="btn secondary" type="button">Clear checks</button>
@@ -293,13 +294,16 @@
 
       flatItems.forEach((entry, index) => {
         const checked = state.checked.has(keyFor(entry));
-        const matchesText = !q || entry.title.toLowerCase().includes(q) || `day ${entry.day}`.includes(q) || `#${index+1}`.includes(q);
-        const matchesStatus = state.status === 'all' || (state.status === 'done' && checked) || (state.status === 'open' && !checked);
+        const number = index + 1;
+        const isHighlighted = isHighlightedNumber(number);
+        const matchesText = !q || entry.title.toLowerCase().includes(q) || `day ${entry.day}`.includes(q) || `#${number}`.includes(q);
+        const matchesStatus = state.status === 'all'
+          || (state.status === 'done' && checked)
+          || (state.status === 'open' && !checked)
+          || (state.status === 'highlighted' && isHighlighted);
         if (!matchesText || !matchesStatus) return;
         visibleItems += 1;
         const id = `item-${index}`;
-        const number = index + 1;
-        const isHighlighted = isHighlightedNumber(number);
         const row = document.createElement('div');
         const rowClasses = ['item'];
         if (checked) rowClasses.push('done');
