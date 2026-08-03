@@ -41,6 +41,8 @@
     .progress-wrap{display:grid;gap:var(--space-2)}
     .progress-bar{height:14px;background:var(--color-primary-highlight);border-radius:var(--radius-full);overflow:hidden}
     .progress-bar span{display:block;height:100%;width:0;background:var(--color-primary);transition:width .25s ease}
+    .progress-bar-esther span{background:#B1CFB7}
+    .progress-bar-valeria span{background:#EFBA93}
     .controls{padding:var(--space-4);display:grid;grid-template-columns:1.5fr .8fr .8fr auto;gap:var(--space-3);position:sticky;top:84px;z-index:15}
     .field,.select,.btn{min-height:48px;border-radius:var(--radius-md);border:1px solid color-mix(in srgb, var(--color-text) 12%, transparent);background:var(--color-surface-2);color:var(--color-text)}
     .field,.select{padding:0 var(--space-4);width:100%}
@@ -105,8 +107,15 @@
           <div class="stat"><span class="muted">Remaining</span><strong id="stat-remaining">0</strong></div>
         </div>
         <div class="progress-wrap">
-          <div class="muted" id="progress-label">0% complete</div>
-          <div class="progress-bar" aria-hidden="true"><span id="progress-bar"></span></div>
+          <div class="progress-row">
+            <div class="progress-labels">
+              <div class="muted" id="progress-label">0% complete</div>
+              <div class="muted" id="progress-label-esther">Esther: 0%</div>
+              <div class="muted" id="progress-label-valeria">Valeria: 0%</div>
+            </div>
+            <div class="progress-bar progress-bar-esther" aria-hidden="true"><span id="progress-bar-esther"></span></div>
+            <div class="progress-bar progress-bar-valeria" aria-hidden="true"><span id="progress-bar-valeria"></span></div>
+          </div>
         </div>
       </div>
 
@@ -231,6 +240,10 @@
     const statusFilterEl = document.getElementById('statusFilter');
     const progressBar = document.getElementById('progress-bar');
     const progressLabel = document.getElementById('progress-label');
+    const progressBarEsther = document.getElementById('progress-bar-esther');
+    const progressBarValeria = document.getElementById('progress-bar-valeria');
+    const progressLabelEsther = document.getElementById('progress-label-esther');
+    const progressLabelValeria = document.getElementById('progress-label-valeria');
     const statItems = document.getElementById('stat-items');
     const statChecked = document.getElementById('stat-checked');
     const statRemaining = document.getElementById('stat-remaining');
@@ -357,13 +370,22 @@
     }
 
     function renderStats(visibleItems = totalItems){
-      const checked = state.checked.size;
-      const remaining = totalItems - checked;
-      const pct = Math.round((checked / totalItems) * 100);
-      statChecked.textContent = checked;
-      statRemaining.textContent = remaining;
-      progressLabel.textContent = `${pct}% complete • ${visibleItems} visible item${visibleItems===1?'':'s'}`;
-      progressBar.style.width = `${pct}%`;
+      const allChecked = state.checked.size;
+      const remaining = totalItems - (Array.from(state.checked).filter(s=>s.endsWith('::E') || s.endsWith('::V')).length / 2);
+      const pctAll = Math.round((Array.from(state.checked).filter(s=>s.endsWith('::E') || s.endsWith('::V')).length / 2 / totalItems) * 100) || 0;
+      // per-person counts
+      const checkedE = Array.from(state.checked).filter(s => s.endsWith('::E')).length;
+      const checkedV = Array.from(state.checked).filter(s => s.endsWith('::V')).length;
+      const pctE = Math.round((checkedE / totalItems) * 100) || 0;
+      const pctV = Math.round((checkedV / totalItems) * 100) || 0;
+      statChecked.textContent = allChecked;
+      statRemaining.textContent = totalItems - allChecked;
+      progressLabel.textContent = `${pctAll}% complete • ${visibleItems} visible item${visibleItems===1?'':'s'}`;
+      if(progressBar) progressBar.style.width = `${pctAll}%`;
+      if(progressBarEsther) progressBarEsther.style.width = `${pctE}%`;
+      if(progressBarValeria) progressBarValeria.style.width = `${pctV}%`;
+      if(progressLabelEsther) progressLabelEsther.textContent = `Esther: ${pctE}% (${checkedE})`;
+      if(progressLabelValeria) progressLabelValeria.textContent = `Valeria: ${pctV}% (${checkedV})`;
     }
 
     searchEl.addEventListener('input', e => { state.search = e.target.value; render(); });
