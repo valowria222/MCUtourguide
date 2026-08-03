@@ -383,8 +383,8 @@
       if(progressBar) progressBar.style.width = `${overallPct}%`;
       if(progressBarEsther) progressBarEsther.style.width = `${pctE}%`;
       if(progressBarValeria) progressBarValeria.style.width = `${pctV}%`;
-      if(progressLabelEsther) progressLabelEsther.textContent = `Esther: ${checkedE}/${totalItems} checked`;
-      if(progressLabelValeria) progressLabelValeria.textContent = `Valeria: ${checkedV}/${totalItems} checked`;
+      if(progressLabelEsther) progressLabelEsther.textContent = `Esther: ${pctE}%`;
+      if(progressLabelValeria) progressLabelValeria.textContent = `Valeria: ${pctV}%`;
     }
 
     searchEl.addEventListener('input', e => { state.search = e.target.value; render(); });
