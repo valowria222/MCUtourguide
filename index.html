@@ -52,10 +52,18 @@
     .day-title{font-weight:700;font-size:var(--text-lg)}
     .duration{font-size:var(--text-sm);color:var(--color-text-muted);padding:.3rem .7rem;border-radius:var(--radius-full);background:var(--color-surface-2)}
     .items{display:grid;gap:var(--space-2)}
-    .item{display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);align-items:start;padding:var(--space-2) 0;border-bottom:1px dashed color-mix(in srgb, var(--color-text) 10%, transparent)}
+    .item{display:grid;grid-template-columns:auto 1fr auto;gap:var(--space-3);align-items:center;padding:var(--space-2) 0;border-bottom:1px dashed color-mix(in srgb, var(--color-text) 10%, transparent)}
     .item:last-child{border-bottom:none}
-    .item input{width:20px;height:20px;margin-top:.22rem;accent-color:var(--color-primary)}
+    .item .check-col{display:flex;align-items:center;justify-content:center}
+    .item input{width:20px;height:20px;margin:0;accent-color:var(--color-primary)}
     .item label{cursor:pointer}
+
+    .checks-header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;padding:0 .25rem;margin-bottom:calc(var(--space-1) * -1)}
+    .checks-header .label{font-weight:700;color:var(--color-text-muted);text-align:center}
+    .check-esther{background:#e6f6ea;border-radius:.4rem;padding:.25rem;display:inline-flex;align-items:center;justify-content:center}
+    .check-valeria{background:#fff1e6;border-radius:.4rem;padding:.25rem;display:inline-flex;align-items:center;justify-content:center}
+    .item .esther{accent-color:#4bbf73}
+    .item .valeria{accent-color:#f59e42}
     .item.done label{text-decoration:line-through;color:var(--color-text-muted)}
     .highlight-pink{display:inline;background:transparent;color:#7a3550;padding:0;border-radius:0;box-shadow:none}
     .item.highlight-row{background:#f6cfe1;border-radius:999px;padding:var(--space-2) var(--space-3);margin:0 -.25rem;border-bottom:none}
@@ -290,30 +298,48 @@
       list.innerHTML = '<div class="day-head"><div><div class="day-title">Full watch order</div></div><div class="duration">'+ totalItems +' items</div></div>';;
       const itemsWrap = document.createElement('div');
       itemsWrap.className = 'items';
+      const checksHeader = document.createElement('div');
+      checksHeader.className = 'checks-header';
+      checksHeader.innerHTML = '<div class="label">Esther</div><div></div><div class="label">Valeria</div>';
+      list.appendChild(checksHeader);
       let visibleItems = 0;
 
       flatItems.forEach((entry, index) => {
-        const checked = state.checked.has(keyFor(entry));
+        const key = keyFor(entry);
         const number = index + 1;
+        const checkedE = state.checked.has(`${key}::E`);
+        const checkedV = state.checked.has(`${key}::V`);
         const isHighlighted = isHighlightedNumber(number);
         const matchesText = !q || entry.title.toLowerCase().includes(q) || `day ${entry.day}`.includes(q) || `#${number}`.includes(q);
         const matchesStatus = state.status === 'all'
-          || (state.status === 'done' && checked)
-          || (state.status === 'open' && !checked)
+          || (state.status === 'done' && (checkedE || checkedV))
+          || (state.status === 'open' && !(checkedE || checkedV))
           || (state.status === 'highlighted' && isHighlighted);
         if (!matchesText || !matchesStatus) return;
         visibleItems += 1;
         const id = `item-${index}`;
         const row = document.createElement('div');
         const rowClasses = ['item'];
-        if (checked) rowClasses.push('done');
+        if (checkedE || checkedV) rowClasses.push('done');
         if (isHighlighted) rowClasses.push('highlight-row');
         row.className = rowClasses.join(' ');
-        row.innerHTML = `<input ${checked ? 'checked' : ''} id="${id}" type="checkbox" /><label for="${id}"><strong style="display:inline-block;min-width:3.2rem;color:var(--color-text-muted);font-size:var(--text-sm)">${getNumberMarkup(index)}</strong> <span>${getHighlightedTitle(entry.title)}</span></label>`;
-        const input = row.querySelector('input');
-        input.addEventListener('change', () => {
-          const k = keyFor(entry);
-          if (input.checked) state.checked.add(k); else state.checked.delete(k);
+        row.innerHTML = `
+          <div class="check-col"><label class="check-esther"><input ${checkedE ? 'checked' : ''} id="esther-${id}" class="esther" type="checkbox" /></label></div>
+          <div><strong style="display:inline-block;min-width:3.2rem;color:var(--color-text-muted);font-size:var(--text-sm)">${getNumberMarkup(index)}</strong> <span>${getHighlightedTitle(entry.title)}</span></div>
+          <div class="check-col"><label class="check-valeria"><input ${checkedV ? 'checked' : ''} id="valeria-${id}" class="valeria" type="checkbox" /></label></div>
+        `;
+        const inputE = row.querySelector('.esther');
+        const inputV = row.querySelector('.valeria');
+        inputE.addEventListener('change', () => {
+          const kE = `${key}::E`;
+          if (inputE.checked) state.checked.add(kE); else state.checked.delete(kE);
+          renderStats();
+          saveCheckedToStorage();
+          render();
+        });
+        inputV.addEventListener('change', () => {
+          const kV = `${key}::V`;
+          if (inputV.checked) state.checked.add(kV); else state.checked.delete(kV);
           renderStats();
           saveCheckedToStorage();
           render();
