@@ -58,6 +58,9 @@
     .item label{cursor:pointer}
     .item.done label{text-decoration:line-through;color:var(--color-text-muted)}
     .highlight-pink{display:inline-block;background:#f6cfe1;color:#7a3550;padding:.08rem .35rem;border-radius:999px;box-shadow:inset 0 -1px 0 rgba(122,53,80,.18)}
+    .item.highlight-row{background:#f6cfe1;border-radius:999px;padding:var(--space-2) var(--space-3);margin:0 -.25rem;border-bottom:none}
+    .item.highlight-row label{color:#7a3550}
+    .item.highlight-row .item-num{color:#7a3550;font-weight:700}
     .footer{padding-bottom:var(--space-8);color:var(--color-text-muted);font-size:var(--text-sm)}
     @media (max-width: 960px){.hero-grid,.days,.controls{grid-template-columns:1fr}.controls{top:76px}}
   </style>
@@ -271,10 +274,11 @@
 
     function getNumberMarkup(index){
       const number = index + 1;
-      const highlightedNumbers = [89,90,92,94,95,96,97];
-      return highlightedNumbers.includes(number)
-        ? `<span class="highlight-pink">#${number}</span>`
-        : `#${number}`;
+      return `<span class="item-num">#${number}</span>`;
+    }
+
+    function isHighlightedNumber(number){
+      return [10,19,23,31,32,83,85,89,90,92,94,95,96,97,161,170,181,182].includes(number);
     }
 
     function render(){
@@ -294,8 +298,13 @@
         if (!matchesText || !matchesStatus) return;
         visibleItems += 1;
         const id = `item-${index}`;
+        const number = index + 1;
+        const isHighlighted = isHighlightedNumber(number);
         const row = document.createElement('div');
-        row.className = `item${checked ? ' done' : ''}`;
+        const rowClasses = ['item'];
+        if (checked) rowClasses.push('done');
+        if (isHighlighted) rowClasses.push('highlight-row');
+        row.className = rowClasses.join(' ');
         row.innerHTML = `<input ${checked ? 'checked' : ''} id="${id}" type="checkbox" /><label for="${id}"><strong style="display:inline-block;min-width:3.2rem;color:var(--color-text-muted);font-size:var(--text-sm)">${getNumberMarkup(index)}</strong> <span>${getHighlightedTitle(entry.title)}</span></label>`;
         const input = row.querySelector('input');
         input.addEventListener('change', () => {
