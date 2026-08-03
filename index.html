@@ -101,7 +101,6 @@
           <p>This page keeps your progress in the browser session, lets you filter by title or day, and gives you a clean layout for ticking items off one by one.</p>
         </div>
         <div class="hero-grid">
-          <div class="stat"><span class="muted">Days</span><strong id="stat-days">88</strong></div>
           <div class="stat"><span class="muted">Titles</span><strong id="stat-items">0</strong></div>
           <div class="stat"><span class="muted">Checked</span><strong id="stat-checked">0</strong></div>
           <div class="stat"><span class="muted">Remaining</span><strong id="stat-remaining">0</strong></div>
@@ -272,7 +271,7 @@
 
     const totalItems = flatItems.length;
     statItems.textContent = totalItems;
-    document.getElementById('stat-days').textContent = 'Linear';
+    // removed 'Days' stat per UI update
 
     function keyFor(entry){ return `${entry.day}::${entry.title}`; }
 
@@ -370,18 +369,18 @@
     }
 
     function renderStats(visibleItems = totalItems){
-      const allChecked = state.checked.size;
-      const remaining = totalItems - (Array.from(state.checked).filter(s=>s.endsWith('::E') || s.endsWith('::V')).length / 2);
-      const pctAll = Math.round((Array.from(state.checked).filter(s=>s.endsWith('::E') || s.endsWith('::V')).length / 2 / totalItems) * 100) || 0;
-      // per-person counts
+      // per-person counts (number of checks by each)
       const checkedE = Array.from(state.checked).filter(s => s.endsWith('::E')).length;
       const checkedV = Array.from(state.checked).filter(s => s.endsWith('::V')).length;
       const pctE = Math.round((checkedE / totalItems) * 100) || 0;
       const pctV = Math.round((checkedV / totalItems) * 100) || 0;
-      statChecked.textContent = allChecked;
-      statRemaining.textContent = totalItems - allChecked;
-      progressLabel.textContent = `${pctAll}% complete • ${visibleItems} visible item${visibleItems===1?'':'s'}`;
-      if(progressBar) progressBar.style.width = `${pctAll}%`;
+      // unique items checked by either person
+      const uniqueChecked = new Set(Array.from(state.checked).map(k => k.replace(/::[EV]$/,''))).size;
+      const overallPct = Math.round(((pctE + pctV) / 2)) || 0;
+      statChecked.textContent = uniqueChecked;
+      statRemaining.textContent = totalItems - uniqueChecked;
+      progressLabel.textContent = `${overallPct}% complete • ${visibleItems} visible item${visibleItems===1?'':'s'}`;
+      if(progressBar) progressBar.style.width = `${overallPct}%`;
       if(progressBarEsther) progressBarEsther.style.width = `${pctE}%`;
       if(progressBarValeria) progressBarValeria.style.width = `${pctV}%`;
       if(progressLabelEsther) progressLabelEsther.textContent = `Esther: ${checkedE}/${totalItems} checked`;
