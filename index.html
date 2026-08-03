@@ -57,7 +57,7 @@
     .item input{width:20px;height:20px;margin-top:.22rem;accent-color:var(--color-primary)}
     .item label{cursor:pointer}
     .item.done label{text-decoration:line-through;color:var(--color-text-muted)}
-    .highlight-pink{display:inline-block;background:#f6cfe1;color:#7a3550;padding:.08rem .35rem;border-radius:999px;box-shadow:inset 0 -1px 0 rgba(122,53,80,.18)}
+    .highlight-pink{display:inline;background:transparent;color:#7a3550;padding:0;border-radius:0;box-shadow:none}
     .item.highlight-row{background:#f6cfe1;border-radius:999px;padding:var(--space-2) var(--space-3);margin:0 -.25rem;border-bottom:none}
     .item.highlight-row label{color:#7a3550}
     .item.highlight-row .item-num{color:#7a3550;font-weight:700}
@@ -287,7 +287,7 @@
       daysEl.innerHTML = '';
       const list = document.createElement('article');
       list.className = 'day-card';
-      list.innerHTML = '<div class="day-head"><div><div class="day-title">Full watch order</div><div class="muted">Exact screenshot order, without day grouping</div></div><div class="duration">'+ totalItems +' items</div></div>';;
+      list.innerHTML = '<div class="day-head"><div><div class="day-title">Full watch order</div></div><div class="duration">'+ totalItems +' items</div></div>';;
       const itemsWrap = document.createElement('div');
       itemsWrap.className = 'items';
       let visibleItems = 0;
