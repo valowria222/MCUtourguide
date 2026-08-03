@@ -376,17 +376,20 @@
       const checkedV = Array.from(state.checked).filter(s => s.endsWith('::V')).length;
       const pctE = Math.round((checkedE / totalItems) * 100) || 0;
       const pctV = Math.round((checkedV / totalItems) * 100) || 0;
-      // unique items checked by either person
-      const uniqueChecked = new Set(Array.from(state.checked).map(k => k.replace(/::[EV]$/,''))).size;
-      const overallPct = Math.round(((pctE + pctV) / 2)) || 0;
-      statChecked.textContent = uniqueChecked;
-      statRemaining.textContent = totalItems - uniqueChecked;
-      progressLabel.textContent = `${overallPct}% complete • ${visibleItems} visible item${visibleItems===1?'':'s'}`;
-      if(progressBar) progressBar.style.width = `${overallPct}%`;
-      if(progressBarEsther) progressBarEsther.style.width = `${pctE}%`;
-      if(progressBarValeria) progressBarValeria.style.width = `${pctV}%`;
-      if(progressLabelEsther) progressLabelEsther.textContent = `${checkedE}/${totalItems - checkedE}`;
-      if(progressLabelValeria) progressLabelValeria.textContent = `${checkedV}/${totalItems - checkedV}`;
+        // items checked by both (intersection)
+        const setE = new Set(Array.from(state.checked).filter(s => s.endsWith('::E')).map(k => k.replace(/::E$/,'')));
+        const setV = new Set(Array.from(state.checked).filter(s => s.endsWith('::V')).map(k => k.replace(/::V$/,'')));
+        const bothChecked = Array.from(setE).filter(k => setV.has(k)).length;
+        const pctBoth = Math.round((bothChecked / totalItems) * 100) || 0;
+        // update stats: show 'both' as main checked/remaining and as primary progress
+        statChecked.textContent = bothChecked;
+        statRemaining.textContent = totalItems - bothChecked;
+        progressLabel.textContent = `${pctBoth}% both complete • ${visibleItems} visible item${visibleItems===1?'':'s'}`;
+        if(progressBar) progressBar.style.width = `${pctBoth}%`;
+        if(progressBarEsther) progressBarEsther.style.width = `${pctE}%`;
+        if(progressBarValeria) progressBarValeria.style.width = `${pctV}%`;
+        if(progressLabelEsther) progressLabelEsther.textContent = `${checkedE}/${totalItems - checkedE}`;
+        if(progressLabelValeria) progressLabelValeria.textContent = `${checkedV}/${totalItems - checkedV}`;
     }
 
     searchEl.addEventListener('input', e => { state.search = e.target.value; render(); });
