@@ -57,6 +57,7 @@
     .item input{width:20px;height:20px;margin-top:.22rem;accent-color:var(--color-primary)}
     .item label{cursor:pointer}
     .item.done label{text-decoration:line-through;color:var(--color-text-muted)}
+    .highlight-pink{display:inline-block;background:#f6cfe1;color:#7a3550;padding:.08rem .35rem;border-radius:999px;box-shadow:inset 0 -1px 0 rgba(122,53,80,.18)}
     .footer{padding-bottom:var(--space-8);color:var(--color-text-muted);font-size:var(--text-sm)}
     @media (max-width: 960px){.hero-grid,.days,.controls{grid-template-columns:1fr}.controls{top:76px}}
   </style>
@@ -249,6 +250,33 @@
 
     function keyFor(entry){ return `${entry.day}::${entry.title}`; }
 
+    function escapeHtml(value){
+      return String(value)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#39;');
+    }
+
+    function getHighlightedTitle(title){
+      const terms = ['Loki Season 1','Loki (Season 1)','Loki Season 2','Loki (Season 2)','Wanda Vision','WandaVision','Avengers','Avengers Age of Ultron','Avengers: Age of Ultron','Avangers Age of Ultron','Civil War','Infinity War','Endgame','Wakanda Forever','Fantastic Four','Thunderbolts'];
+      let escaped = escapeHtml(title);
+      terms.forEach(term => {
+        const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
+        escaped = escaped.replace(pattern, '<span class="highlight-pink">$&</span>');
+      });
+      return escaped;
+    }
+
+    function getNumberMarkup(index){
+      const number = index + 1;
+      const highlightedNumbers = [89,90,92,94,95,96,97];
+      return highlightedNumbers.includes(number)
+        ? `<span class="highlight-pink">#${number}</span>`
+        : `#${number}`;
+    }
+
     function render(){
       const q = state.search.trim().toLowerCase();
       daysEl.innerHTML = '';
@@ -268,7 +296,7 @@
         const id = `item-${index}`;
         const row = document.createElement('div');
         row.className = `item${checked ? ' done' : ''}`;
-        row.innerHTML = `<input ${checked ? 'checked' : ''} id="${id}" type="checkbox" /><label for="${id}"><strong style="display:inline-block;min-width:3.2rem;color:var(--color-text-muted);font-size:var(--text-sm)">#${index+1}</strong> ${entry.title}</label>`;
+        row.innerHTML = `<input ${checked ? 'checked' : ''} id="${id}" type="checkbox" /><label for="${id}"><strong style="display:inline-block;min-width:3.2rem;color:var(--color-text-muted);font-size:var(--text-sm)">${getNumberMarkup(index)}</strong> <span>${getHighlightedTitle(entry.title)}</span></label>`;
         const input = row.querySelector('input');
         input.addEventListener('change', () => {
           const k = keyFor(entry);
