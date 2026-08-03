@@ -52,14 +52,14 @@
     .day-title{font-weight:700;font-size:var(--text-lg)}
     .duration{font-size:var(--text-sm);color:var(--color-text-muted);padding:.3rem .7rem;border-radius:var(--radius-full);background:var(--color-surface-2)}
     .items{display:grid;gap:var(--space-2)}
-    .item{display:grid;grid-template-columns:auto 1fr auto;gap:var(--space-3);align-items:center;padding:var(--space-2) 0;border-bottom:1px dashed color-mix(in srgb, var(--color-text) 10%, transparent)}
+    .item{display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);align-items:center;padding:var(--space-2) 0;border-bottom:1px dashed color-mix(in srgb, var(--color-text) 10%, transparent)}
     .item:last-child{border-bottom:none}
     .item .check-col{display:flex;align-items:center;justify-content:center}
     .item input{width:20px;height:20px;margin:0;accent-color:var(--color-primary)}
     .item label{cursor:pointer}
 
-    .checks-header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;padding:0 .25rem;margin-bottom:calc(var(--space-1) * -1)}
-    .checks-header .label{font-weight:700;color:var(--color-text-muted);text-align:center}
+    .checks-header{display:grid;grid-template-columns:auto 1fr;align-items:center;padding:0 .25rem;margin-bottom:calc(var(--space-1) * -1)}
+    .checks-header .label{font-weight:700;color:var(--color-text-muted);display:flex;gap:var(--space-3);align-items:center}
     .check-esther{background:#B1CFB7;border-radius:.4rem;padding:.25rem;display:inline-flex;align-items:center;justify-content:center}
     .check-valeria{background:#EFBA93;border-radius:.4rem;padding:.25rem;display:inline-flex;align-items:center;justify-content:center}
     .item .esther{accent-color:#B1CFB7}
@@ -83,7 +83,6 @@
         </div>
         <div>
           <h1>MCU Binge Checklist</h1>
-          <div class="muted">88 days • interactive web checklist</div>
         </div>
       </div>
       <button class="theme-toggle" data-theme-toggle aria-label="Switch theme"></button>
@@ -300,7 +299,7 @@
       itemsWrap.className = 'items';
       const checksHeader = document.createElement('div');
       checksHeader.className = 'checks-header';
-      checksHeader.innerHTML = '<div class="label">Esther</div><div></div><div class="label">Valeria</div>';
+      checksHeader.innerHTML = '<div class="label"><span class="label-esther">Esther</span><span class="label-valeria">Valeria</span></div><div></div>';
       list.appendChild(checksHeader);
       let visibleItems = 0;
 
@@ -324,9 +323,8 @@
         if (isHighlighted) rowClasses.push('highlight-row');
         row.className = rowClasses.join(' ');
         row.innerHTML = `
-          <div class="check-col"><label class="check-esther"><input ${checkedE ? 'checked' : ''} id="esther-${id}" class="esther" type="checkbox" /></label></div>
+          <div class="check-col"><label class="check-esther"><input ${checkedE ? 'checked' : ''} id="esther-${id}" class="esther" type="checkbox" /></label><label class="check-valeria" style="margin-left:var(--space-2)"><input ${checkedV ? 'checked' : ''} id="valeria-${id}" class="valeria" type="checkbox" /></label></div>
           <div><strong style="display:inline-block;min-width:3.2rem;color:var(--color-text-muted);font-size:var(--text-sm)">${getNumberMarkup(index)}</strong> <span>${getHighlightedTitle(entry.title)}</span></div>
-          <div class="check-col"><label class="check-valeria"><input ${checkedV ? 'checked' : ''} id="valeria-${id}" class="valeria" type="checkbox" /></label></div>
         `;
         const inputE = row.querySelector('.esther');
         const inputV = row.querySelector('.valeria');
