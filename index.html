@@ -54,12 +54,12 @@
     .items{display:grid;gap:var(--space-2)}
     .item{display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);align-items:center;padding:var(--space-2) 0;border-bottom:1px dashed color-mix(in srgb, var(--color-text) 10%, transparent)}
     .item:last-child{border-bottom:none}
-    .item .check-col{display:flex;align-items:center;justify-content:center}
+    .item .check-col{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-2);padding-right:var(--space-2)}
     .item input{width:20px;height:20px;margin:0;accent-color:var(--color-primary)}
     .item label{cursor:pointer}
 
     .checks-header{display:grid;grid-template-columns:auto 1fr;align-items:center;padding:0 .25rem;margin-bottom:calc(var(--space-1) * -1)}
-    .checks-header .label{font-weight:700;color:var(--color-text-muted);display:flex;gap:var(--space-3);align-items:center}
+    .checks-header .label{font-weight:700;color:var(--color-text-muted);display:flex;flex-direction:column;gap:calc(var(--space-1));align-items:center}
     .label-esther{background:#B1CFB7;color:#1f3b27;padding:.25rem .5rem;border-radius:.4rem;font-weight:700}
     .label-valeria{background:#EFBA93;color:#5a3412;padding:.25rem .5rem;border-radius:.4rem;font-weight:700}
     .check-esther{background:#B1CFB7;border-radius:.4rem;padding:.25rem;display:inline-flex;align-items:center;justify-content:center}
