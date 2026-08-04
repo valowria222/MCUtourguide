@@ -46,6 +46,8 @@
     .progress-bar-valeria span{background:#EFBA93}
     .controls{padding:var(--space-4);display:grid;grid-template-columns:1.5fr .8fr .8fr auto;gap:var(--space-3);position:sticky;top:84px;z-index:15}
     .sync-panel{padding:var(--space-4);display:grid;grid-template-columns:1fr .8fr .8fr;gap:var(--space-3);background:var(--color-surface);border:1px solid color-mix(in srgb, var(--color-text) 10%, transparent);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);margin-top:var(--space-4)}
+    .auth-card{display:grid;gap:var(--space-3)}
+    .auth-row{display:grid;grid-template-columns:1fr 1fr auto auto;gap:var(--space-3)}
     .field,.select,.btn{min-height:48px;border-radius:var(--radius-md);border:1px solid color-mix(in srgb, var(--color-text) 12%, transparent);background:var(--color-surface-2);color:var(--color-text)}
     .field,.select{padding:0 var(--space-4);width:100%}
     .btn{padding:0 var(--space-4);background:var(--color-primary);color:#fff;border:none}
@@ -137,16 +139,35 @@
       <button id="clearChecks" class="btn secondary" type="button">Clear checks</button>
       <button id="resetStorage" class="btn secondary" type="button">Zurücksetzen</button>
     </section>
-    <section class="sync-panel" aria-label="Cloud sync controls">
-      <input id="cloudBinId" class="field" type="text" placeholder="JSON Bin ID" aria-label="JSON Bin ID" />
-      <input id="cloudBinKey" class="field" type="text" placeholder="JSON Bin Secret Key" aria-label="JSON Bin Secret Key" />
-      <button id="saveCloud" class="btn" type="button">Cloud speichern</button>
-      <button id="loadCloud" class="btn secondary" type="button">Cloud laden</button>
-      <div id="cloudStatus" class="muted">Cloud sync ready with JSON Bin ID and Key.</div>
+    <section class="sync-panel" aria-label="Live sync status">
+      <div class="auth-card">
+        <div id="authStatus" class="muted">Keine Anmeldung nötig. Alle Besucher sehen denselben synchronisierten Stand.</div>
+        <div id="cloudStatus" class="muted">Live-Sync wird gestartet…</div>
+      </div>
     </section>
   </main>
 
-  <script>
+  <section id="days" class="days" aria-live="polite"></section>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: 'AIzaSyDVS3gYKOilHn6IjgXnApLe1KV_O-ahdJE',
+      authDomain: 'mcutourguide1.firebaseapp.com',
+      projectId: 'mcutourguide1',
+      storageBucket: 'mcutourguide1.firebasestorage.app',
+      messagingSenderId: '908202161932',
+      appId: '1:908202161932:web:d4dc417122554ef1acfb29'
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    window.firebaseApp = app;
+
     const data = [
       {day:1,duration:'8H 28M',items:['Captain America: The First Avenger','Agent Carter: One Shot','Captain Marvel','Iron Man','Iron Man 2']},
       {day:2,duration:'8H 24M',items:['A Funny Thing Happened on the Way to Thor’s Hammer: One Shot','The Incredible Hulk','The Consultant: One Shot','Thor','The Avengers','Item 47: One Shot','Thor: The Dark World']},
@@ -257,53 +278,45 @@
     const clearChecks = document.getElementById('clearChecks');
     const saveChecks = document.getElementById('saveChecks');
     const resetStorage = document.getElementById('resetStorage');
-    const cloudBinIdEl = document.getElementById('cloudBinId');
-    const cloudBinKeyEl = document.getElementById('cloudBinKey');
-    const saveCloud = document.getElementById('saveCloud');
-    const loadCloud = document.getElementById('loadCloud');
+    const authStatus = document.getElementById('authStatus');
     const cloudStatus = document.getElementById('cloudStatus');
 
-    function getJsonBinUrl(binId){
-      return `https://api.jsonbin.io/v3/b/${encodeURIComponent(binId)}`;
-    }
-
-    function saveCheckedToCloud(binId, secretKey){
-      if(!binId || !secretKey) return Promise.reject('JSON Bin ID oder Secret Key fehlt.');
-      return fetch(getJsonBinUrl(binId), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': secretKey,
-          'X-Bin-Versioning': 'false'
-        },
-        body: JSON.stringify(Array.from(state.checked))
-      }).then(res => {
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      });
-    }
-
-    function loadCheckedFromCloud(binId, secretKey){
-      if(!binId || !secretKey) return Promise.reject('JSON Bin ID oder Secret Key fehlt.');
-      return fetch(getJsonBinUrl(binId) + '/latest', {
-        method: 'GET',
-        headers: {
-          'X-Master-Key': secretKey
-        }
-      }).then(res => {
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      }).then(data => data.record);
-    }
+    let syncDocRef = null;
+    let unsubscribeSync = null;
+    let cloudSyncInitialized = false;
 
     function updateCloudStatus(message){
       if(cloudStatus) cloudStatus.textContent = message;
+    }
+
+    function updateAuthStatus(message){
+      if(authStatus) authStatus.textContent = message;
+    }
+
+    async function saveCheckedToCloud(){
+      saveCheckedToStorage();
+      if(!syncDocRef) {
+        updateCloudStatus('Live-Sync ist noch nicht bereit.');
+        return;
+      }
+      await setDoc(syncDocRef, {
+        checked: Array.from(state.checked),
+        updatedAt: new Date().toISOString(),
+        shared: true
+      }, { merge: true });
     }
 
     function saveCheckedToStorage(){
       try{
         localStorage.setItem('mcubinge:checked', JSON.stringify(Array.from(state.checked)));
       }catch(e){/* ignore */}
+    }
+
+    function persistProgress(message){
+      saveCheckedToStorage();
+      saveCheckedToCloud()
+        .then(() => updateCloudStatus(message))
+        .catch(err => updateCloudStatus(`Synchronisierung fehlgeschlagen: ${err.message || err}`));
     }
 
     function loadCheckedFromStorage(){
@@ -396,14 +409,14 @@
           const kE = `${key}::E`;
           if (inputE.checked) state.checked.add(kE); else state.checked.delete(kE);
           renderStats();
-          saveCheckedToStorage();
+          persistProgress('Änderung gespeichert und synchronisiert.');
           render();
         });
         inputV.addEventListener('change', () => {
           const kV = `${key}::V`;
           if (inputV.checked) state.checked.add(kV); else state.checked.delete(kV);
           renderStats();
-          saveCheckedToStorage();
+          persistProgress('Änderung gespeichert und synchronisiert.');
           render();
         });
         itemsWrap.appendChild(row);
@@ -442,36 +455,20 @@
 
     searchEl.addEventListener('input', e => { state.search = e.target.value; render(); });
     statusFilterEl.addEventListener('change', e => { state.status = e.target.value; render(); });
-    clearChecks.addEventListener('click', () => { state.checked.clear(); saveCheckedToStorage(); render(); });
-
-    saveChecks.addEventListener('click', () => { saveCheckedToStorage(); });
-    resetStorage.addEventListener('click', () => { localStorage.removeItem('mcubinge:checked'); state.checked.clear(); render(); });
-
-    saveCloud.addEventListener('click', () => {
-      const binId = cloudBinIdEl.value.trim();
-      const secretKey = cloudBinKeyEl.value.trim();
-      if(!binId || !secretKey){ updateCloudStatus('Bitte JSON Bin ID und Secret Key eingeben.'); return; }
-      saveCheckedToCloud(binId, secretKey)
-        .then(() => updateCloudStatus('Cloud gespeichert. Verwende denselben Bin ID und Key auf anderen Geräten.'))
-        .catch(err => updateCloudStatus(`Cloud speichern fehlgeschlagen: ${err.message || err}`));
+    clearChecks.addEventListener('click', () => {
+      state.checked.clear();
+      persistProgress('Alle Häkchen wurden entfernt und synchronisiert.');
+      render();
     });
 
-    loadCloud.addEventListener('click', () => {
-      const binId = cloudBinIdEl.value.trim();
-      const secretKey = cloudBinKeyEl.value.trim();
-      if(!binId || !secretKey){ updateCloudStatus('Bitte JSON Bin ID und Secret Key eingeben.'); return; }
-      loadCheckedFromCloud(binId, secretKey)
-        .then(value => {
-          if(Array.isArray(value)){
-            state.checked = new Set(value);
-            saveCheckedToStorage();
-            render();
-            updateCloudStatus('Cloud geladen. Status für dieses Gerät aktualisiert.');
-          } else {
-            updateCloudStatus('Kein Cloud-Datensatz gefunden oder ungültiges Format.');
-          }
-        })
-        .catch(err => updateCloudStatus(`Cloud laden fehlgeschlagen: ${err.message || err}`));
+    saveChecks.addEventListener('click', () => {
+      persistProgress('Änderungen wurden gespeichert und synchronisiert.');
+    });
+    resetStorage.addEventListener('click', () => {
+      localStorage.removeItem('mcubinge:checked');
+      state.checked.clear();
+      persistProgress('Speicher zurückgesetzt und synchronisiert.');
+      render();
     });
 
     (function(){
@@ -489,6 +486,68 @@
 
     loadCheckedFromStorage();
     render();
+
+    async function initializeSharedSync(){
+      try {
+        await signInAnonymously(auth);
+      } catch (err) {
+        updateCloudStatus(`Live-Sync konnte nicht gestartet werden: ${err.message || err}`);
+      }
+    }
+
+    onAuthStateChanged(auth, async () => {
+      if (unsubscribeSync) {
+        unsubscribeSync();
+        unsubscribeSync = null;
+      }
+      cloudSyncInitialized = false;
+      syncDocRef = doc(db, 'shared', 'progress');
+      updateAuthStatus('Keine Anmeldung nötig. Alle Besucher sehen denselben Stand.');
+      updateCloudStatus('Verbinde mit gemeinsamer Live-Sync…');
+
+      try {
+        const snap = await getDoc(syncDocRef);
+        if (snap.exists()) {
+          const remoteChecked = Array.isArray(snap.data().checked) ? snap.data().checked : [];
+          state.checked = new Set(remoteChecked);
+          saveCheckedToStorage();
+          render();
+        } else {
+          await saveCheckedToCloud();
+        }
+      } catch (err) {
+        updateCloudStatus(`Live-Sync konnte nicht geladen werden: ${err.message || err}`);
+      }
+
+      unsubscribeSync = onSnapshot(syncDocRef, snapshot => {
+        if (snapshot.exists()) {
+          const record = snapshot.data();
+          const remoteChecked = Array.isArray(record.checked) ? record.checked : [];
+          const localChecked = Array.from(state.checked);
+          const remoteString = JSON.stringify(remoteChecked.slice().sort());
+          const localString = JSON.stringify(localChecked.slice().sort());
+
+          if (!cloudSyncInitialized || remoteString !== localString) {
+            state.checked = new Set(remoteChecked);
+            saveCheckedToStorage();
+            render();
+            cloudSyncInitialized = true;
+            updateCloudStatus('Live-Sync aktiv – alle Besucher sehen denselben Stand.');
+          }
+        } else if (!cloudSyncInitialized) {
+          saveCheckedToCloud()
+            .then(() => {
+              cloudSyncInitialized = true;
+              updateCloudStatus('Live-Sync aktiv – alle Besucher sehen denselben Stand.');
+            })
+            .catch(err => updateCloudStatus(`Live-Sync konnte nicht gestartet werden: ${err.message || err}`));
+        }
+      }, err => {
+        updateCloudStatus(`Live-Sync fehlgeschlagen: ${err.message || err}`);
+      });
+    });
+
+    initializeSharedSync();
   </script>
 </body>
 </html>
