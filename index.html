@@ -7,6 +7,9 @@
   <link rel="preconnect" href="https://api.fontshare.com">
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=boska@700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Marvel:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
     :root, [data-theme="light"] {
       --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
@@ -45,6 +48,7 @@
     .progress-bar-esther span{background:#B1CFB7}
     .progress-bar-valeria span{background:#EFBA93}
     .controls{padding:var(--space-4);display:grid;grid-template-columns:1.5fr .8fr .8fr auto;gap:var(--space-3);position:sticky;top:84px;z-index:15}
+    .sync-panel{padding:var(--space-4);display:grid;grid-template-columns:1fr .8fr .8fr;gap:var(--space-3);background:var(--color-surface);border:1px solid color-mix(in srgb, var(--color-text) 10%, transparent);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);margin-top:var(--space-4)}
     .field,.select,.btn{min-height:48px;border-radius:var(--radius-md);border:1px solid color-mix(in srgb, var(--color-text) 12%, transparent);background:var(--color-surface-2);color:var(--color-text)}
     .field,.select{padding:0 var(--space-4);width:100%}
     .btn{padding:0 var(--space-4);background:var(--color-primary);color:#fff;border:none}
@@ -133,12 +137,15 @@
           <option value="highlighted">NEED vor Dooms Day</option>
         </select>
         <button id="saveChecks" class="btn" type="button">Speichern</button>
-        <button id="clearChecks" class="btn secondary" type="button">Clear checks</button>
-        <button id="resetStorage" class="btn secondary" type="button">Zurücksetzen</button>
-      </section>
+      <button id="clearChecks" class="btn secondary" type="button">Clear checks</button>
+      <button id="resetStorage" class="btn secondary" type="button">Zurücksetzen</button>
     </section>
-
-    <section id="days" class="days" aria-live="polite"></section>
+    <section class="sync-panel" aria-label="Cloud sync controls">
+      <input id="cloudKey" class="field" type="text" placeholder="Cloud sync key" aria-label="Cloud sync key" />
+      <button id="saveCloud" class="btn" type="button">Cloud speichern</button>
+      <button id="loadCloud" class="btn secondary" type="button">Cloud laden</button>
+      <div id="cloudStatus" class="muted">Cloud sync disabled until Firebase config is set.</div>
+    </section>
   </main>
 
   <script>
@@ -252,6 +259,48 @@
     const clearChecks = document.getElementById('clearChecks');
     const saveChecks = document.getElementById('saveChecks');
     const resetStorage = document.getElementById('resetStorage');
+    const cloudKeyEl = document.getElementById('cloudKey');
+    const saveCloud = document.getElementById('saveCloud');
+    const loadCloud = document.getElementById('loadCloud');
+    const cloudStatus = document.getElementById('cloudStatus');
+
+    const firebaseConfig = {
+      apiKey: 'YOUR_API_KEY',
+      authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
+      databaseURL: 'https://YOUR_PROJECT_ID.firebaseio.com',
+      projectId: 'YOUR_PROJECT_ID',
+      storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+      messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+      appId: 'YOUR_APP_ID'
+    };
+    const cloudEnabled = firebaseConfig.apiKey !== 'YOUR_API_KEY';
+
+    function initCloudSync(){
+      if(!cloudEnabled) return;
+      try{
+        firebase.initializeApp(firebaseConfig);
+        firebase.auth().signInAnonymously().catch(()=>{});
+        cloudStatus.textContent = 'Cloud sync ready. Enter a key and save/load from another device.';
+      }catch(e){
+        cloudStatus.textContent = 'Cloud sync failed to initialize. Check your Firebase config.';
+      }
+    }
+
+    function saveCheckedToCloud(key){
+      if(!cloudEnabled || !key) return Promise.reject('Cloud sync not configured or key missing.');
+      const ref = firebase.database().ref(`mcubinge/${key}`);
+      return ref.set(Array.from(state.checked));
+    }
+
+    function loadCheckedFromCloud(key){
+      if(!cloudEnabled || !key) return Promise.reject('Cloud sync not configured or key missing.');
+      const ref = firebase.database().ref(`mcubinge/${key}`);
+      return ref.once('value').then(snapshot => snapshot.val());
+    }
+
+    function updateCloudStatus(message){
+      if(cloudStatus) cloudStatus.textContent = message;
+    }
 
     function saveCheckedToStorage(){
       try{
@@ -400,6 +449,31 @@
     saveChecks.addEventListener('click', () => { saveCheckedToStorage(); });
     resetStorage.addEventListener('click', () => { localStorage.removeItem('mcubinge:checked'); state.checked.clear(); render(); });
 
+    saveCloud.addEventListener('click', () => {
+      const key = cloudKeyEl.value.trim();
+      if(!key){ updateCloudStatus('Bitte Cloud sync key eingeben.'); return; }
+      saveCheckedToCloud(key)
+        .then(() => updateCloudStatus('Cloud gespeichert. Verwende denselben Key auf anderen Geräten.'))
+        .catch(err => updateCloudStatus(`Cloud speichern fehlgeschlagen: ${err}`));
+    });
+
+    loadCloud.addEventListener('click', () => {
+      const key = cloudKeyEl.value.trim();
+      if(!key){ updateCloudStatus('Bitte Cloud sync key eingeben.'); return; }
+      loadCheckedFromCloud(key)
+        .then(value => {
+          if(Array.isArray(value)){
+            state.checked = new Set(value);
+            saveCheckedToStorage();
+            render();
+            updateCloudStatus('Cloud geladen. Status für dieses Gerät aktualisiert.');
+          } else {
+            updateCloudStatus('Kein Cloud-Datensatz gefunden.');
+          }
+        })
+        .catch(err => updateCloudStatus(`Cloud laden fehlgeschlagen: ${err}`));
+    });
+
     (function(){
       const btn = document.querySelector('[data-theme-toggle]');
       let mode = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -413,6 +487,7 @@
       btn.addEventListener('click', () => { mode = mode === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', mode); syncIcon(); });
     })();
 
+    initCloudSync();
     loadCheckedFromStorage();
     render();
   </script>
