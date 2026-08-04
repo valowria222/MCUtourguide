@@ -141,7 +141,7 @@
     </section>
     <section class="sync-panel" aria-label="Live sync status">
       <div class="auth-card">
-        <div id="authStatus" class="muted">Keine Anmeldung nötig. Alle Besucher sehen denselben synchronisierten Stand.</div>
+        <div id="authStatus" class="muted"></div>
         <div id="cloudStatus" class="muted">Live-Sync wird gestartet…</div>
       </div>
     </section>
@@ -163,10 +163,22 @@
       appId: '1:908202161932:web:d4dc417122554ef1acfb29'
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    window.firebaseApp = app;
+    let app;
+    let auth;
+    let db;
+    let firebaseReady = false;
+
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+      window.firebaseApp = app;
+      firebaseReady = true;
+    } catch (err) {
+      firebaseReady = false;
+      updateCloudStatus('Firebase nicht verfügbar. Lokaler Modus aktiv.');
+      console.error('Firebase init failed:', err);
+    }
 
     const data = [
       {day:1,duration:'8H 28M',items:['Captain America: The First Avenger','Agent Carter: One Shot','Captain Marvel','Iron Man','Iron Man 2']},
@@ -295,8 +307,8 @@
 
     async function saveCheckedToCloud(){
       saveCheckedToStorage();
-      if(!syncDocRef) {
-        updateCloudStatus('Live-Sync ist noch nicht bereit.');
+      if(!firebaseReady || !syncDocRef) {
+        updateCloudStatus('Live-Sync nicht aktiv. Änderungen werden lokal gespeichert.');
         return;
       }
       await setDoc(syncDocRef, {
@@ -488,64 +500,75 @@
     render();
 
     async function initializeSharedSync(){
+      if (!firebaseReady) {
+        updateCloudStatus('Live-Sync nicht verfügbar. Lokaler Modus aktiv.');
+        return;
+      }
+
       try {
         await signInAnonymously(auth);
       } catch (err) {
         updateCloudStatus(`Live-Sync konnte nicht gestartet werden: ${err.message || err}`);
+        return;
       }
     }
 
-    onAuthStateChanged(auth, async () => {
-      if (unsubscribeSync) {
-        unsubscribeSync();
-        unsubscribeSync = null;
-      }
-      cloudSyncInitialized = false;
-      syncDocRef = doc(db, 'shared', 'progress');
-      updateAuthStatus('Keine Anmeldung nötig. Alle Besucher sehen denselben Stand.');
-      updateCloudStatus('Verbinde mit gemeinsamer Live-Sync…');
-
-      try {
-        const snap = await getDoc(syncDocRef);
-        if (snap.exists()) {
-          const remoteChecked = Array.isArray(snap.data().checked) ? snap.data().checked : [];
-          state.checked = new Set(remoteChecked);
-          saveCheckedToStorage();
-          render();
-        } else {
-          await saveCheckedToCloud();
+    if (firebaseReady) {
+      onAuthStateChanged(auth, async () => {
+        if (unsubscribeSync) {
+          unsubscribeSync();
+          unsubscribeSync = null;
         }
-      } catch (err) {
-        updateCloudStatus(`Live-Sync konnte nicht geladen werden: ${err.message || err}`);
-      }
+        cloudSyncInitialized = false;
+        syncDocRef = doc(db, 'shared', 'progress');
+        updateAuthStatus('Keine Anmeldung nötig. Alle Besucher sehen denselben Stand.');
+        updateCloudStatus('Verbinde mit gemeinsamer Live-Sync…');
 
-      unsubscribeSync = onSnapshot(syncDocRef, snapshot => {
-        if (snapshot.exists()) {
-          const record = snapshot.data();
-          const remoteChecked = Array.isArray(record.checked) ? record.checked : [];
-          const localChecked = Array.from(state.checked);
-          const remoteString = JSON.stringify(remoteChecked.slice().sort());
-          const localString = JSON.stringify(localChecked.slice().sort());
-
-          if (!cloudSyncInitialized || remoteString !== localString) {
+        try {
+          const snap = await getDoc(syncDocRef);
+          if (snap.exists()) {
+            const remoteChecked = Array.isArray(snap.data().checked) ? snap.data().checked : [];
             state.checked = new Set(remoteChecked);
             saveCheckedToStorage();
             render();
-            cloudSyncInitialized = true;
-            updateCloudStatus('Live-Sync aktiv – alle Besucher sehen denselben Stand.');
+          } else {
+            await saveCheckedToCloud();
           }
-        } else if (!cloudSyncInitialized) {
-          saveCheckedToCloud()
-            .then(() => {
+        } catch (err) {
+          updateCloudStatus(`Live-Sync konnte nicht geladen werden: ${err.message || err}`);
+          return;
+        }
+
+        unsubscribeSync = onSnapshot(syncDocRef, snapshot => {
+          if (snapshot.exists()) {
+            const record = snapshot.data();
+            const remoteChecked = Array.isArray(record.checked) ? record.checked : [];
+            const localChecked = Array.from(state.checked);
+            const remoteString = JSON.stringify(remoteChecked.slice().sort());
+            const localString = JSON.stringify(localChecked.slice().sort());
+
+            if (!cloudSyncInitialized || remoteString !== localString) {
+              state.checked = new Set(remoteChecked);
+              saveCheckedToStorage();
+              render();
               cloudSyncInitialized = true;
               updateCloudStatus('Live-Sync aktiv – alle Besucher sehen denselben Stand.');
-            })
-            .catch(err => updateCloudStatus(`Live-Sync konnte nicht gestartet werden: ${err.message || err}`));
-        }
-      }, err => {
-        updateCloudStatus(`Live-Sync fehlgeschlagen: ${err.message || err}`);
+            }
+          } else if (!cloudSyncInitialized) {
+            saveCheckedToCloud()
+              .then(() => {
+                cloudSyncInitialized = true;
+                updateCloudStatus('Live-Sync aktiv – alle Besucher sehen denselben Stand.');
+              })
+              .catch(err => updateCloudStatus(`Live-Sync konnte nicht gestartet werden: ${err.message || err}`));
+          }
+        }, err => {
+          updateCloudStatus(`Live-Sync fehlgeschlagen: ${err.message || err}`);
+        });
       });
-    });
+    } else {
+      updateAuthStatus('Firebase nicht initialisiert. Lokaler Modus aktiv.');
+    }
 
     initializeSharedSync();
   </script>
