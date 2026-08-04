@@ -7,9 +7,6 @@
   <link rel="preconnect" href="https://api.fontshare.com">
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=boska@700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Marvel:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
     :root, [data-theme="light"] {
       --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
@@ -141,10 +138,11 @@
       <button id="resetStorage" class="btn secondary" type="button">Zurücksetzen</button>
     </section>
     <section class="sync-panel" aria-label="Cloud sync controls">
-      <input id="cloudKey" class="field" type="text" placeholder="Cloud sync key" aria-label="Cloud sync key" />
+      <input id="cloudBinId" class="field" type="text" placeholder="JSON Bin ID" aria-label="JSON Bin ID" />
+      <input id="cloudBinKey" class="field" type="text" placeholder="JSON Bin Secret Key" aria-label="JSON Bin Secret Key" />
       <button id="saveCloud" class="btn" type="button">Cloud speichern</button>
       <button id="loadCloud" class="btn secondary" type="button">Cloud laden</button>
-      <div id="cloudStatus" class="muted">Cloud sync disabled until Firebase config is set.</div>
+      <div id="cloudStatus" class="muted">Cloud sync ready with JSON Bin ID and Key.</div>
     </section>
   </main>
 
@@ -259,43 +257,43 @@
     const clearChecks = document.getElementById('clearChecks');
     const saveChecks = document.getElementById('saveChecks');
     const resetStorage = document.getElementById('resetStorage');
-    const cloudKeyEl = document.getElementById('cloudKey');
+    const cloudBinIdEl = document.getElementById('cloudBinId');
+    const cloudBinKeyEl = document.getElementById('cloudBinKey');
     const saveCloud = document.getElementById('saveCloud');
     const loadCloud = document.getElementById('loadCloud');
     const cloudStatus = document.getElementById('cloudStatus');
 
-    const firebaseConfig = {
-      apiKey: 'YOUR_API_KEY',
-      authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-      databaseURL: 'https://YOUR_PROJECT_ID.firebaseio.com',
-      projectId: 'YOUR_PROJECT_ID',
-      storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-      messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-      appId: 'YOUR_APP_ID'
-    };
-    const cloudEnabled = firebaseConfig.apiKey !== 'YOUR_API_KEY';
-
-    function initCloudSync(){
-      if(!cloudEnabled) return;
-      try{
-        firebase.initializeApp(firebaseConfig);
-        firebase.auth().signInAnonymously().catch(()=>{});
-        cloudStatus.textContent = 'Cloud sync ready. Enter a key and save/load from another device.';
-      }catch(e){
-        cloudStatus.textContent = 'Cloud sync failed to initialize. Check your Firebase config.';
-      }
+    function getJsonBinUrl(binId){
+      return `https://api.jsonbin.io/v3/b/${encodeURIComponent(binId)}`;
     }
 
-    function saveCheckedToCloud(key){
-      if(!cloudEnabled || !key) return Promise.reject('Cloud sync not configured or key missing.');
-      const ref = firebase.database().ref(`mcubinge/${key}`);
-      return ref.set(Array.from(state.checked));
+    function saveCheckedToCloud(binId, secretKey){
+      if(!binId || !secretKey) return Promise.reject('JSON Bin ID oder Secret Key fehlt.');
+      return fetch(getJsonBinUrl(binId), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': secretKey,
+          'X-Bin-Versioning': 'false'
+        },
+        body: JSON.stringify(Array.from(state.checked))
+      }).then(res => {
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      });
     }
 
-    function loadCheckedFromCloud(key){
-      if(!cloudEnabled || !key) return Promise.reject('Cloud sync not configured or key missing.');
-      const ref = firebase.database().ref(`mcubinge/${key}`);
-      return ref.once('value').then(snapshot => snapshot.val());
+    function loadCheckedFromCloud(binId, secretKey){
+      if(!binId || !secretKey) return Promise.reject('JSON Bin ID oder Secret Key fehlt.');
+      return fetch(getJsonBinUrl(binId) + '/latest', {
+        method: 'GET',
+        headers: {
+          'X-Master-Key': secretKey
+        }
+      }).then(res => {
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      }).then(data => data.record);
     }
 
     function updateCloudStatus(message){
@@ -450,17 +448,19 @@
     resetStorage.addEventListener('click', () => { localStorage.removeItem('mcubinge:checked'); state.checked.clear(); render(); });
 
     saveCloud.addEventListener('click', () => {
-      const key = cloudKeyEl.value.trim();
-      if(!key){ updateCloudStatus('Bitte Cloud sync key eingeben.'); return; }
-      saveCheckedToCloud(key)
-        .then(() => updateCloudStatus('Cloud gespeichert. Verwende denselben Key auf anderen Geräten.'))
-        .catch(err => updateCloudStatus(`Cloud speichern fehlgeschlagen: ${err}`));
+      const binId = cloudBinIdEl.value.trim();
+      const secretKey = cloudBinKeyEl.value.trim();
+      if(!binId || !secretKey){ updateCloudStatus('Bitte JSON Bin ID und Secret Key eingeben.'); return; }
+      saveCheckedToCloud(binId, secretKey)
+        .then(() => updateCloudStatus('Cloud gespeichert. Verwende denselben Bin ID und Key auf anderen Geräten.'))
+        .catch(err => updateCloudStatus(`Cloud speichern fehlgeschlagen: ${err.message || err}`));
     });
 
     loadCloud.addEventListener('click', () => {
-      const key = cloudKeyEl.value.trim();
-      if(!key){ updateCloudStatus('Bitte Cloud sync key eingeben.'); return; }
-      loadCheckedFromCloud(key)
+      const binId = cloudBinIdEl.value.trim();
+      const secretKey = cloudBinKeyEl.value.trim();
+      if(!binId || !secretKey){ updateCloudStatus('Bitte JSON Bin ID und Secret Key eingeben.'); return; }
+      loadCheckedFromCloud(binId, secretKey)
         .then(value => {
           if(Array.isArray(value)){
             state.checked = new Set(value);
@@ -468,10 +468,10 @@
             render();
             updateCloudStatus('Cloud geladen. Status für dieses Gerät aktualisiert.');
           } else {
-            updateCloudStatus('Kein Cloud-Datensatz gefunden.');
+            updateCloudStatus('Kein Cloud-Datensatz gefunden oder ungültiges Format.');
           }
         })
-        .catch(err => updateCloudStatus(`Cloud laden fehlgeschlagen: ${err}`));
+        .catch(err => updateCloudStatus(`Cloud laden fehlgeschlagen: ${err.message || err}`));
     });
 
     (function(){
@@ -487,7 +487,6 @@
       btn.addEventListener('click', () => { mode = mode === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', mode); syncIcon(); });
     })();
 
-    initCloudSync();
     loadCheckedFromStorage();
     render();
   </script>
